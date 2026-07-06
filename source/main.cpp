@@ -16,7 +16,7 @@ int main(int argc, char* argv[]) {
 
     printf("NX Portal - Web Injection Test\n");
     printf("--------------------------------\n");
-    printf("Launching browser to xbox.com/play...\n");
+    printf("Launching browser to google.com (control test)...\n");
     printf("Press A to launch, + to exit without launching.\n\n");
 
     PadState pad;
@@ -37,7 +37,7 @@ int main(int argc, char* argv[]) {
             WebCommonConfig config;
             WebCommonReply reply;
 
-            Result rc = webPageCreate(&config, "https://www.xbox.com/play");
+            Result rc = webPageCreate(&config, "https://www.google.com");
             if (R_FAILED(rc)) {
                 printf("webPageCreate failed: 0x%x\n", rc);
                 consoleUpdate(NULL);
