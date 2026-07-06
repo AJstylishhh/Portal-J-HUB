@@ -1,88 +1,73 @@
 // NX Portal - Web Injection Test
-// Minimal test: launch the system browser to xbox.com/play and try
-// injecting a harmless test script via the JsExtension flag.
-//
-// Goal: confirm whether libnx's WebCommonConfig JsExtension actually
-// works for general (non-offline) web browsing on real hardware.
-// If the alert box below appears when the page loads, injection works
-// and we can move on to injecting the real better-xcloud script.
+// Tests launching the system browser to two different URLs (Google
+// and Xbox Cloud Gaming) to figure out whether "This feature is not
+// available" is a general whitelist/config issue, or something
+// specific to xbox.com refusing to run in this browser.
 
 #include <switch.h>
 #include <cstdio>
 #include <cstring>
 
+static void launchBrowser(const char* url, const char* label) {
+    WebCommonConfig config;
+    WebCommonReply reply;
+
+    printf("\nLaunching browser to %s...\n", label);
+    consoleUpdate(NULL);
+
+    Result rc = webPageCreate(&config, url);
+    if (R_FAILED(rc)) {
+        printf("webPageCreate failed: 0x%x\n", rc);
+        consoleUpdate(NULL);
+        return;
+    }
+
+    webConfigSetJsExtension(&config, true);
+    webConfigSetPageCache(&config, true);
+    webConfigSetBootLoadingIcon(&config, true);
+    webConfigSetWhitelist(&config, ".*");
+
+    rc = webConfigShow(&config, &reply);
+    if (R_FAILED(rc)) {
+        printf("webConfigShow failed: 0x%x\n", rc);
+    } else {
+        printf("Browser closed normally after showing %s.\n", label);
+    }
+    consoleUpdate(NULL);
+}
+
 int main(int argc, char* argv[]) {
     consoleInit(NULL);
-
-    printf("NX Portal - Web Injection Test\n");
-    printf("--------------------------------\n");
-    printf("Launching browser to google.com (control test)...\n");
-    printf("Press A to launch, + to exit without launching.\n\n");
 
     PadState pad;
     padConfigureInput(1, HidNpadStyleSet_NpadStandard);
     padInitializeDefault(&pad);
 
-    bool launched = false;
-    while (appletMainLoop() && !launched) {
+    bool running = true;
+    while (appletMainLoop() && running) {
         padUpdate(&pad);
         u64 kDown = padGetButtonsDown(&pad);
 
+        consoleClear();
+        printf("NX Portal - Web Injection Test\n");
+        printf("--------------------------------\n");
+        printf("A: Test Google (control)\n");
+        printf("X: Test Xbox Cloud Gaming\n");
+        printf("+: Exit\n");
+        consoleUpdate(NULL);
+
         if (kDown & HidNpadButton_Plus) {
-            consoleExit(NULL);
-            return 0;
+            running = false;
+            break;
         }
 
         if (kDown & HidNpadButton_A) {
-            WebCommonConfig config;
-            WebCommonReply reply;
-
-            Result rc = webPageCreate(&config, "https://www.google.com");
-            if (R_FAILED(rc)) {
-                printf("webPageCreate failed: 0x%x\n", rc);
-                consoleUpdate(NULL);
-                launched = true;
-                break;
-            }
-
-            // Try enabling JS extension / injection support.
-            // NOTE: this may not be supported outside the offline/local
-            // web applet mode - this test exists specifically to find out.
-            webConfigSetJsExtension(&config, true);
-
-            // Simple test payload: just show an alert so we can visually
-            // confirm on-device whether injected JS actually executed.
-            const char* testScript =
-                "alert('NX Portal injection test OK');";
-
-            // Some libnx versions expose webConfigSetInjectionScript or
-            // similar - if this call doesn't exist in your libnx version,
-            // comment it out and just test whether the page loads at all
-            // first.
-            // webConfigSetInjectionScript(&config, testScript);
-            (void)testScript;
-
-            webConfigSetWhitelist(&config, "^https?://.*");
-
-            rc = webConfigShow(&config, &reply);
-            if (R_FAILED(rc)) {
-                printf("webConfigShow failed: 0x%x\n", rc);
-            } else {
-                printf("Browser closed normally.\n");
-            }
-
-            launched = true;
+            launchBrowser("https://www.google.com", "Google (control test)");
         }
 
-        consoleUpdate(NULL);
-    }
-
-    printf("\nDone. Press + to exit.\n");
-    while (appletMainLoop()) {
-        padUpdate(&pad);
-        u64 kDown = padGetButtonsDown(&pad);
-        if (kDown & HidNpadButton_Plus) break;
-        consoleUpdate(NULL);
+        if (kDown & HidNpadButton_X) {
+            launchBrowser("https://www.xbox.com/play", "Xbox Cloud Gaming");
+        }
     }
 
     consoleExit(NULL);
